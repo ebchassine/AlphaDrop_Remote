@@ -30,11 +30,9 @@ The alpha hat plotted is the fitted power‐law exponent of each layer’s empir
     Large $\hat\alpha$ (e.g.\ 5–10) → light tail, indicating a faster drop‐off in eigenvalues and more “random‐matrix‐like” behaviour.
 
 When you plot the mean $\hat\alpha$ on the y-axis, you’re showing the average tail exponent across all layers at that point in training—a proxy for how “heavy‐tailed” your network’s weight spectra are over time.
-
-
-
-
 """
+
+
 import os
 import glob
 import argparse

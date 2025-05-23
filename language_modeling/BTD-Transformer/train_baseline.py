@@ -132,6 +132,7 @@ args.work_dir = os.path.join(args.work_dir,  f'tensor_transformer_{args.n_layer}
 
 logging = create_exp_dir(args.work_dir, debug=False) 
 
+
 # Set the random seed manually for reproducibility.
 set_seed(args.seed)
 # torch.cuda.set_device(1)
@@ -506,7 +507,7 @@ def train(epoch=0):
             val_loss = evaluate(va_iter)
             test_loss = evaluate(te_iter)
             
-            # ESD PER EPOCH
+            # ESD PER EPOCH Measurements 
             esd_dir = os.path.join(args.work_dir, 'stats')
             os.makedirs(esd_dir, exist_ok=True)
 
@@ -517,7 +518,7 @@ def train(epoch=0):
                 pl_fitting=args.pl_fitting,
                 xmin_pos=args.xmin_pos,
                 filter_zeros=(args.filter_zeros == 'True'),
-                conv_norm=0.5       # or expose args.conv_norm if you add it below
+                conv_norm=0.5 # epxose as arg later 
             )
 
             np.save(os.path.join(esd_dir, f'esd_epoch_{epoch}.npy'), metrics)
@@ -589,6 +590,20 @@ try:
     for epoch in itertools.count(start=1):
         
         train(epoch)
+        # # —— ESD per-epoch dump (copy of “epoch_0” logic) ——
+        # esd_dir = os.path.join(args.work_dir, 'stats')  
+        # os.makedirs(esd_dir, exist_ok=True)
+        # metrics = net_esd_estimator(
+        #     model,
+        #     EVALS_THRESH = 0.00001,
+        #     bins        = 100,
+        #     pl_fitting  = args.pl_fitting,
+        #     xmin_pos    = args.xmin_pos,
+        #     filter_zeros= (args.filter_zeros == 'True')
+        # )
+        # np.save(os.path.join(esd_dir, f'esd_epoch_{epoch}.npy'), metrics)
+
+
         if train_step == args.max_step:
             logging('-' * 100)
             logging('End of training')

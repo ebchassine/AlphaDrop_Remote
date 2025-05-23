@@ -5,7 +5,7 @@ Script to analyze per-epoch ESD metrics over sliding windows and plot the rate o
 
 Place this in BTD-Transformer/analysis/ and run (for example )
 
-    python esd_jacobian.py \
+    python esd_window.py \
         --esd_dir ../../checkpoints/tensorized/baseline/ptb-adam/bs120/tensor_transformer_3layer/head_1/max_step40000_max_epoch200_log_interval200/median_xmin_pos2/seed_51_lr_0.000125/stats \
         --window_size 20 \
         --output_dir graphs

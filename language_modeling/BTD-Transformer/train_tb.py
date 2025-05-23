@@ -708,11 +708,27 @@ training_stats['step'].append(0)
 
 pbar = tqdm.tqdm(total=args.max_step)
 total_start_time = time.time()
-# At any point you can hit Ctrl + C to break out of training early.
+# At any point you can hit Ctrl C to break out of training early.
 try:
     for epoch in itertools.count(start=1):
         epoch_start_time = time.time()
         train()
+        # ESD CHANGES HERE 
+        esd_dir = os.path.join(args.work_dir, 'stats')
+        os.makedirs(esd_dir, exist_ok=True)
+        metrics = net_esd_estimator(
+            net=model,
+            EVALS_THRESH=1e-5,
+            bins=100,
+            pl_fitting=args.pl_fitting,
+            xmin_pos=args.xmin_pos,
+            filter_zeros=args.filter_zeros,
+            conv_norm=0.5
+        )
+        np.save(
+            os.path.join(esd_dir, f'esd_epoch_{epoch}.npy'),
+            metrics
+        )
         epoch_duration = time.time() - epoch_start_time
         training_stats['epoch_duration'].append(epoch_duration)
         if train_step == args.max_step or epoch == args.max_epoch:
