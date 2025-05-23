@@ -101,7 +101,7 @@ parser.add_argument('--dynamic-loss-scale',       action='store_true',          
 parser.add_argument('--xmin-pos',                 type=float,         default=2,                    help='xmin_index = size of eigs // xmin_pos')
 parser.add_argument('--pl-fitting',              type=str,           default='median',           help="")
 parser.add_argument('--filter-zeros',             type=str,           default='False')
-
+parser.add_argument('--conv-norm', type=float, default=0.5, help='scaling factor for convolution flattening')
 # optimizer related parameters
 parser.add_argument('--wdecay',                   type=float,         default=1.2e-6,               help='weight decay')
 parser.add_argument('--eps',                      type=float,         default=1e-8)
@@ -517,7 +517,7 @@ def train(epoch=0):
                 pl_fitting=args.pl_fitting,
                 xmin_pos=args.xmin_pos,
                 filter_zeros=(args.filter_zeros == 'True'),
-                conv_norm=args.conv_norm  # if you expose that
+                conv_norm=0.5       # or expose args.conv_norm if you add it below
             )
 
             np.save(os.path.join(esd_dir, f'esd_epoch_{epoch}.npy'), metrics)
