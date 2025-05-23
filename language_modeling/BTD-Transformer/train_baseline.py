@@ -505,6 +505,24 @@ def train(epoch=0):
             # evaluate the model in the validation set
             val_loss = evaluate(va_iter)
             test_loss = evaluate(te_iter)
+            
+            # ESD PER EPOCH
+            esd_dir = os.path.join(args.work_dir, 'stats')
+            os.makedirs(esd_dir, exist_ok=True)
+
+            metrics = net_esd_estimator(
+                net=model,
+                EVALS_THRESH=1e-5,
+                bins=100,
+                pl_fitting=args.pl_fitting,
+                xmin_pos=args.xmin_pos,
+                filter_zeros=(args.filter_zeros == 'True'),
+                conv_norm=args.conv_norm  # if you expose that
+            )
+
+            np.save(os.path.join(esd_dir, f'esd_epoch_{epoch}.npy'), metrics)
+
+
             logging('-' * 100)
             log_str = '| Eval {:3d} at step {:>8d} | time: {:5.2f}s ' \
                       '| valid loss {:5.2f}'.format(
