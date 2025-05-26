@@ -6,7 +6,7 @@ Script to analyze per-epoch ESD metrics over fixed-size segments and plot the ES
 
 Place this in BTD-Transformer/analysis/ and run:
 
-    python esd_jacobian.py \
+    python esd_window.py \
         --esd_dir ../../checkpoints/tensorized/baseline/ptb-adam/bs120/tensor_transformer_3layer/head_1/max_step40000_max_epoch200_log_interval200/median_xmin_pos2/seed_51_lr_0.000125/stats \
         --window_size 20 \
         --output_dir graphs
@@ -31,81 +31,87 @@ The alpha hat plotted is the fitted power‐law exponent of each layer’s empir
 
 When you plot the mean $\hat\alpha$ on the y-axis, you’re showing the average tail exponent across all layers at that point in training—a proxy for how “heavy‐tailed” your network’s weight spectra are over time.
 """
-
-
 import os
 import glob
-import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+import argparse
 
 def load_esd_by_epoch(esd_dir):
     """
-    Load all esd_epoch_{i}.npy files and return sorted arrays of epochs and mean alphahat.
+    Scan esd_dir for esd_epoch_{k}.npy files, load each,
+    and return sorted arrays of epochs and their mean α.
     """
     pattern = os.path.join(esd_dir, 'esd_epoch_*.npy')
     files = sorted(
         glob.glob(pattern),
         key=lambda f: int(os.path.basename(f).split('_')[2].split('.')[0])
     )
+
     epochs = []
     alpha_means = []
     for f in files:
         epoch = int(os.path.basename(f).split('_')[2].split('.')[0])
         data = np.load(f, allow_pickle=True).item()
+        if 'alpha' not in data:
+            raise KeyError(
+                f"'alpha' key not found in {f}; available keys: {list(data.keys())}"
+            )
         epochs.append(epoch)
-        alpha_means.append(np.mean(data['alphahat']))
+        alpha_means.append(np.mean(data['alpha']))
+
     return np.array(epochs), np.array(alpha_means)
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='Plot ESD α over fixed windows of epochs')
     parser.add_argument('--esd_dir', required=True,
-                        help='Path to stats/ dir containing esd_epoch_{i}.npy files')
+                        help='Directory containing esd_epoch_{i}.npy files')
     parser.add_argument('--window_size', type=int, default=50,
                         help='Number of epochs per segment window')
-    parser.add_argument('--output_dir', default='graphs',
-                        help='Directory under analysis/ to save segment plots')
+    parser.add_argument('--output_dir', required=True,
+                        help='Directory to save segment plots')
     args = parser.parse_args()
 
-    # Load epochs and mean alphahat
     epochs, alpha_means = load_esd_by_epoch(args.esd_dir)
-    total_epochs = len(epochs)
-    if total_epochs == 0:
+    total = len(epochs)
+    if total == 0:
         raise ValueError(f"No ESD files found in {args.esd_dir}")
 
-    # Prepare output directory
-    base_out = os.path.dirname(__file__)
-    out_dir = os.path.join(base_out, args.output_dir)
-    os.makedirs(out_dir, exist_ok=True)
-
-    # Compute and plot for each consecutive window segment
+    os.makedirs(args.output_dir, exist_ok=True)
     w = args.window_size
-    n_segments = total_epochs // w
-    if n_segments == 0:
-        raise ValueError(
-            f"Not enough epochs ({total_epochs}) for even one segment of size {w}" )
 
-    for seg in range(n_segments):
-        start_idx = seg * w
-        end_idx = start_idx + w
-        seg_epochs = epochs[start_idx:end_idx+1]
-        seg_alpha = alpha_means[start_idx:end_idx+1]
-        # compute slope
-        slope = (seg_alpha[-1] - seg_alpha[0]) / w
+    # iterate non-overlapping windows
+    segment_idx = 0
+    for start in range(0, total, w):
+        end = min(start + w, total)
+        seg_epochs = epochs[start:end]
+        seg_alpha = alpha_means[start:end]
 
-        plt.figure()
-        plt.plot(seg_epochs, seg_alpha, marker='o')
+        if len(seg_epochs) < 2:
+            # skip windows too small to plot a trend
+            break
+
+        # slope = Δα / Δepoch_count
+        slope = (seg_alpha[-1] - seg_alpha[0]) / (seg_epochs[-1] - seg_epochs[0])
+
+        plt.figure(figsize=(8,5))
+        plt.plot(seg_epochs, seg_alpha, marker='o', linestyle='-')
         plt.xlabel('Epoch')
-        plt.ylabel('Mean $\\hat\\alpha$')
+        plt.ylabel('Mean $\\alpha$')
         plt.title(
-            f'Segment {seg+1}: Epochs {seg_epochs[0]}–{seg_epochs[-1]}\n'
-            f'Rate = {slope:.4f} per epoch'
+            f'Segment {segment_idx+1}: Epochs {seg_epochs[0]}–{seg_epochs[-1]}\n'
+            f'Rate = {slope:.4f} α-units/epoch'
         )
+        plt.grid(True)
         plt.tight_layout()
-        filename = f'esd_segment_{seg+1}_{seg_epochs[0]}_{seg_epochs[-1]}.png'
-        plt.savefig(os.path.join(out_dir, filename))
+
+        fname = f'esd_segment_{segment_idx+1}_{seg_epochs[0]}_{seg_epochs[-1]}.png'
+        outpath = os.path.join(args.output_dir, fname)
+        plt.savefig(outpath)
         plt.close()
-        print(f"Saved segment plot: {filename}")
+        print(f"Saved: {outpath}")
+
+        segment_idx += 1
 
 if __name__ == '__main__':
     main()
