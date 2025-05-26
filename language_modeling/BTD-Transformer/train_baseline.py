@@ -31,7 +31,7 @@ def set_seed(seed=42):
     # Set a fixed value for the hash seed
     os.environ["PYTHONHASHSEED"] = str(seed)
     os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
+    os.environ["CUBLAS_WORKACE_CONFIG"] = ":16:8"
 
 parser = argparse.ArgumentParser(description='PyTorch Transformer Language Model')
 parser.add_argument('--data',                     type=str,           default='data/ptb',           help='location of the data corpus')
