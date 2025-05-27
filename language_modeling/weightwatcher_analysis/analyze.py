@@ -4,6 +4,19 @@ analyze_with_watcher_api.py
 
 Use the WeightWatcher API to analyze an AlphaDrop model checkpoint,
 produce per-layer ESD plots, and emit CSV/JSON summaries.
+
+python analyze.py \
+  --model-path /jumbo/yaoqingyang/ewongchassine/Projects/TempBalance/\
+language_modeling/checkpoints/tensorized/baseline/ptb-adam/bs120/\
+tensor_transformer_3layer/head_1/max_step40000_max_epoch200_log_interval200/\
+median_xmin_pos2/seed_13_lr_0.000125/model.pt \
+  --output-dir baseline_seed13_api \
+  --randomize
+
+python analyze.py \
+  --model-path /jumbo/yaoqingyang/ewongchassine/Projects/TempBalance/language_modeling/checkpoints/tensorized/tb_stage_update/ptb-adam/bs120-remove_last-eigs_thresh_50/tensor_transformer_3layer/head_1/max_step40000_max_epoch200_log_interval200_esd_interval10/alpha_median_min1.0_slope1.0_xmin_pos2.0_assign_tb_linear_map/seed_51_lr_0.000125/model.pt \
+  --output-dir experiment_seed13_api \
+  --randomize
 """
 import os
 import sys
@@ -93,18 +106,17 @@ def main():
     # ─── 5) Persist results ─────────────────────────────────────────────
     csv_out = os.path.join(args.output_dir, 'ww_details.csv')
     details.to_csv(csv_out, index=False)
-    print(f"✅ Layer details CSV → {csv_out}")
+    print(f"Layer details CSV → {csv_out}")
 
     summary = watcher.get_summary(details)
     json_out = os.path.join(args.output_dir, 'ww_summary.json')
     with open(json_out, 'w') as f:
         json.dump(summary, f, indent=2)
-    print(f"✅ Model summary JSON → {json_out}")
+    print(f"Model summary JSON → {json_out}")
 
-    # ─── 6) Quick console report ────────────────────────────────────────
-    print("\n📊 Per-layer α exponents:")
+    print("\nPer-layer α exponents:")
     print(details[['layer_id','alpha']])
-    print("\n📈 Overall summary metrics:")
+    print("\nOverall summary metrics:")
     print(summary)
 
 if __name__ == '__main__':
