@@ -1,62 +1,110 @@
+#!/usr/bin/env python3
 """
-Load your AlphaDrop model, run WeightWatcher analyses on each layer,
-and dump per-layer metrics to JSON and CSV.
+python analyze_weights.py   --model-path /jumbo/yaoqingyang/ewongchassine/Projects/TempBalance/language_modeling/checkpoints/tensorized/baseline/ptb-adam/bs120/tensor_transformer_3layer/head_1/max_step40000_max_epoch200_log_interval200/median_xmin_pos2/seed_13_lr_0.000125/model.pt   --output-dir seed13_ww   --tgt-len 32   --ext-len 0   --mem-len 0
 """
 import os
+import sys
+import argparse
 import json
 import torch
 import pandas as pd
 from weightwatcher import WeightWatcher
 
-# — Modify these paths to point to your model and code root —
-"""
-Baseline model paths:
-13 seed
-/jumbo/yaoqingyang/ewongchassine/Projects/TempBalance/language_modeling/checkpoints/tensorized/baseline/ptb-adam/bs120/tensor_transformer_3layer/head_1/max_step40000_max_epoch200_log_interval200/median_xmin_pos2/seed_13_lr_0.000125/model.pt
-37 seed
-/jumbo/yaoqingyang/ewongchassine/Projects/TempBalance/language_modeling/checkpoints/tensorized/baseline/ptb-adam/bs120/tensor_transformer_3layer/head_1/max_step40000_max_epoch200_log_interval200/median_xmin_pos2/seed_37_lr_0.000125/model.pt
-43 seed
-/jumbo/yaoqingyang/ewongchassine/Projects/TempBalance/language_modeling/checkpoints/tensorized/baseline/ptb-adam/bs120/tensor_transformer_3layer/head_1/max_step40000_max_epoch200_log_interval200/median_xmin_pos2/seed_43_lr_0.000125/model.pt
-51 seed 
-/jumbo/yaoqingyang/ewongchassine/Projects/TempBalance/language_modeling/checkpoints/tensorized/baseline/ptb-adam/bs120/tensor_transformer_3layer/head_1/max_step40000_max_epoch200_log_interval200/median_xmin_pos2/seed_51_lr_0.000125/model.pt
-71 seed 
-/jumbo/yaoqingyang/ewongchassine/Projects/TempBalance/language_modeling/checkpoints/tensorized/baseline/ptb-adam/bs120/tensor_transformer_3layer/head_1/max_step40000_max_epoch200_log_interval200/median_xmin_pos2/seed_71_lr_0.000125/model.pt
+SCRIPT_DIR    = os.path.dirname(os.path.abspath(__file__))
+LM_ROOT       = os.path.abspath(os.path.join(SCRIPT_DIR, '..'))
+BTD_DIR       = os.path.join(LM_ROOT, 'BTD-Transformer')
+BTD_UTILS_DIR = os.path.join(BTD_DIR,   'utils')
+sys.path.insert(0, BTD_UTILS_DIR)
+sys.path.insert(0, BTD_DIR)
 
-AD model paths 
-13 seed (undertrained?)
-/jumbo/yaoqingyang/ewongchassine/Projects/TempBalance/language_modeling/checkpoints/tensorized/tb_stage_update/ptb-adam/bs120-remove_last-eigs_thresh_50/tensor_transformer_3layer/head_1/max_step40000_max_epoch200_log_interval200_esd_interval10/alpha_median_min1.0_slope1.0_xmin_pos2.0_assign_tb_linear_map/seed_13_lr_0.000125/model.pt
-51 seed
-/jumbo/yaoqingyang/ewongchassine/Projects/TempBalance/language_modeling/checkpoints/tensorized/tb_stage_update/ptb-adam/bs120-remove_last-eigs_thresh_50/tensor_transformer_3layer/head_1/max_step40000_max_epoch200_log_interval200_esd_interval10/alpha_median_min1.0_slope1.0_xmin_pos2.0_assign_tb_linear_map/seed_51_lr_0.000125/model.pt
+from models.transformer_upload_TempBal import TensorizedTransformerLM
 
-"""
-MODEL_PATH = "/absolute/path/from/gitignore/model.pt"
-MODEL_PATH = "/jumbo/yaoqingyang/ewongchassine/Projects/TempBalance/language_modeling/checkpoints/tensorized/baseline/ptb-adam/bs120/tensor_transformer_3layer/head_1/max_step40000_max_epoch200_log_interval200/median_xmin_pos2/seed_13_lr_0.000125/model.pt"
-OUTPUT_DIR = "weightwatcher_analysis"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument('--model-path', required=True)
+    p.add_argument('--output-dir', default='weightwatcher_analysis')
+    # hyper‐parameters should match your training run
+    p.add_argument('--n-layer', type=int,   default=3)
+    p.add_argument('--n-head',  type=int,   default=1)
+    p.add_argument('--d-model', type=int,   default=256)
+    p.add_argument('--d-head',  type=int,   default=40)
+    p.add_argument('--d-inner', type=int,   default=2100)
+    p.add_argument('--dropout', type=float, default=0.3)
+    p.add_argument('--dropatt', type=float, default=0.0)
+    p.add_argument('--tgt-len', type=int, default=32,
+                    help='Target sequence length (same as training)')
+    p.add_argument('--ext-len', type=int, default=0,
+                    help='Extended context length (same as training)')
+    p.add_argument('--mem-len', type=int, default=0,
+                    help='Memory length (same as training)')
 
-# 1) load your model architecture & weights
-from BTD_Transformer.models.transformer_upload_TempBal import TensorizedTransformerLM
-# …or whatever your AlphaDrop model class is…
-model = TensorizedTransformerLM( # ← use the same args you trained with
-    n_token=…, n_layer=3, n_head=1, d_model=256, d_head=40,
-    d_inner=2100, dropout=0.3, dropatt=0.0, …
-)
-checkpoint = torch.load(MODEL_PATH, map_location="cpu")
-model.load_state_dict(checkpoint["model_state_dict"])
-model.eval()
+    args = p.parse_args()
 
-# 2) instantiate WW and run
-ww = WeightWatcher(model=model)
-print("🔍 Running WeightWatcher analysis (this may take a minute)…")
-results = ww.analyze()
+    os.makedirs(args.output_dir, exist_ok=True)
 
-# 3) save results
-#   • full raw JSON
-with open(os.path.join(OUTPUT_DIR, "ww_raw_results.json"), "w") as f:
-    json.dump(results, f, indent=2)
+    # load checkpoint & infer vocab size
+    ckpt = torch.load(args.model_path, map_location='cpu')
+    sd   = ckpt.get('model_state_dict', ckpt)
+    emb_key = next(k for k in sd if k.endswith('emb_layers.0.weight'))
+    n_token = sd[emb_key].size(0)
 
-#   • tabular summary (one row per layer)
-df = pd.DataFrame(results)
-df.to_csv(os.path.join(OUTPUT_DIR, "ww_layer_summary.csv"), index=False)
+    # build & load model (ignore name‐mismatches)
+    model = TensorizedTransformerLM(
+        n_token=n_token,
+        n_layer=args.n_layer,
+        n_head=args.n_head,
+        d_model=args.d_model,
+        d_head=args.d_head,
+        d_inner=args.d_inner,
+        dropout=args.dropout,
+        dropatt=args.dropatt,
+        tgt_len=args.tgt_len,
+        ext_len=args.ext_len,
+        mem_len=args.mem_len,
+    )
+    model.load_state_dict(sd, strict=False)   # <-- allow mismatches
 
-print(f"Analysis complete. Results in {OUTPUT_DIR}/")
+    # run WeightWatcher
+    ww = WeightWatcher(model=model)
+    results = ww.analyze()
+
+    # save outputs
+    # with open(os.path.join(args.output_dir, 'ww_raw_results.json'), 'w') as f:
+
+    raw_out = os.path.join(args.output_dir, 'ww_raw_results.json')
+
+    # make sure results is a list of dicts
+    entries = results if isinstance(results, list) else [results]
+
+    clean_results = []
+    for layer_res in entries:
+        clean = {}
+        for k, v in layer_res.items():
+            if isinstance(v, pd.DataFrame):
+                clean[k] = v.to_dict(orient='records')
+            elif isinstance(v, pd.Series):
+                clean[k] = v.tolist()
+            elif isinstance(v, np.ndarray):
+                clean[k] = v.tolist()
+            else:
+                # For any numpy scalar types
+                if hasattr(v, 'item') and not isinstance(v, str):
+                    try:
+                        clean[k] = v.item()
+                        continue
+                    except:
+                        pass
+                # Fallback: try serializing, else stringify
+                try:
+                    json.dumps(v)
+                    clean[k] = v
+                except TypeError:
+                    clean[k] = str(v)
+        clean_results.append(clean)
+
+    with open(raw_out, 'w') as f:
+        json.dump(clean_results, f, indent=2)
+    print(f"✅ Raw results written to {raw_out}")
+
+if __name__ == '__main__':
+    main()
